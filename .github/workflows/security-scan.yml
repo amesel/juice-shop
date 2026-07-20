@@ -1,0 +1,35 @@
+name: Security Scan (SAST)
+
+on:
+  pull_request:
+
+permissions:
+  id-token: write      # OIDCトークン取得に必須(③権限対策)
+  contents: read       # コードのcheckoutに必要
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      # コード取得(コミットSHA固定 = ⑤サプライチェーン対策)
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      # Semgrepをコンテナで実行(イメージをダイジェスト固定 = ⑤)。runner上にSARIF出力
+      - name: Run Semgrep
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            semgrep/semgrep@sha256:3dab091ee3247fce7e4ed3df9f92b3bd72692c083295f53cec3f135b86404db1 \
+            semgrep scan --config auto --sarif -o /src/results.sarif
+
+      # AWS認証(OIDC、長期キーなし = ③)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@5579c002bb4778aa43395ef1df492868a9a1c83f  # v4.0.2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}   # ← 後述(READMEで手動設定を案内)
+          aws-region: ap-northeast-1
+
+      # SARIF を S3 にアップロード(runnerにAWS CLIはプリインストール済み)
+      - name: Upload SARIF to S3
+        run: aws s3 cp results.sarif s3://ssdlc-sarif-input-549135611050/results.sarif
