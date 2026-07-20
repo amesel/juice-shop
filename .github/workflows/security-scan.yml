@@ -31,5 +31,8 @@ jobs:
           aws-region: ap-northeast-1
 
       # SARIF を S3 にアップロード(runnerにAWS CLIはプリインストール済み)
+      # PR番号をプレフィックスとしてパスに含める(後段のLambdaでPR特定に使用)
       - name: Upload SARIF to S3
-        run: aws s3 cp results.sarif s3://ssdlc-sarif-input-549135611050/results.sarif
+        run: |
+          aws s3 cp results.sarif \
+            s3://ssdlc-sarif-input-549135611050/pr-${{ github.event.pull_request.number }}/results.sarif
